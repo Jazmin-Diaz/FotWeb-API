@@ -1,47 +1,42 @@
-const fs = require('fs');
 const path = require('path');
-const Image = require('../models/image'); // Crear un modelo de imagen
+const fs = require('fs');
+const image = require('../utils/image');
+const Image = require('../models/images'); // Assuming you have an Image model
 
 async function uploadImage(req, res) {
-  const { image } = req.body;
-  const base64Data = image.replace(/^data:image\/png;base64,/, "");
+    const { usuario_id } = req.usuario;
 
-  const filePath = `uploads/${Date.now()}.png`;
-  fs.writeFile(filePath, base64Data, 'base64', async (err) => {
-    if (err) return res.status(500).send({ msg: "Error al guardar la imagen" });
+    if (!req.files.image) {
+        return res.status(400).send({ msg: "No se encontró la imagen" });
+    }
 
-    const newImage = new Image({ url: `http://localhost:4000/${filePath}` });
-    await newImage.save();
+    const imagePath = image.getFilePath(req.files.image);
 
-    res.status(200).send(newImage);
-  });
+    const newImage = new Image({
+        usuario_id,
+        imageUrl: imagePath
+    });
+
+    try {
+        await newImage.save();
+        res.status(200).send(newImage);
+    } catch (error) {
+        res.status(500).send({ msg: "Error al guardar la imagen" });
+    }
 }
 
 async function getImages(req, res) {
-  try {
-    const images = await Image.find();
-    res.status(200).send(images);
-  } catch (error) {
-    res.status(500).send({ msg: "Error al obtener las imágenes" });
-  }
-}
+    const { usuario_id } = req.usuario;
 
-async function deleteImage(req, res) {
-  const { id } = req.params;
-  try {
-    const image = await Image.findByIdAndDelete(id);
-    if (image) {
-      const filePath = image.url.replace('http://localhost:4000/', '');
-      fs.unlinkSync(filePath);
+    try {
+        const images = await Image.find({ usuario_id });
+        res.status(200).send(images);
+    } catch (error) {
+        res.status(500).send({ msg: "Error al recuperar las imágenes" });
     }
-    res.status(200).send({ msg: "Imagen eliminada correctamente" });
-  } catch (error) {
-    res.status(500).send({ msg: "Error al eliminar la imagen" });
-  }
 }
 
 module.exports = {
-  uploadImage,
-  getImages,
-  deleteImage,
+    uploadImage,
+    getImages
 };
